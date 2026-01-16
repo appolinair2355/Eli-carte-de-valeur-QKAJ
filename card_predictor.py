@@ -395,7 +395,7 @@ class CardPredictor:
         
     # --- Logique INTER (Collecte et Analyse) ---
     def collect_inter_data(self, game_number: int, message: str):
-        """Collecte les données (N-2 -> N) même si le message est en cours."""
+        """Collecte les données (N-2 -> N). La collecte se fait dès la réception du message."""
         # On normalise pour les cœurs
         message = message.replace("❤️", "♥️")
         
@@ -403,7 +403,7 @@ class CardPredictor:
         trigger_cards = self.get_first_two_cards_info(message)
         if not trigger_cards: return
         
-        # Pour le résultat du jeu actuel N (pour la vérification/apprentissage)
+        # Pour le résultat du jeu actuel N
         # On regarde la première carte du premier groupe
         first_card_full = trigger_cards[0]
         match_suit = re.search(r'(♠️|♥️|♦️|♣️)', first_card_full)
@@ -413,16 +413,17 @@ class CardPredictor:
         # Remplacement du costume par la carte de valeur
         result_value = SUIT_TO_VALUE_MAP.get(suit, suit)
         
-        # Vérifier si déjà dans collected_games
-        if game_number in self.collected_games:
-            return
-
-        # On stocke uniquement la PREMIÈRE carte comme déclencheur pour ce jeu N
-        # (Conformément à l'instruction : la collecte enregistre la première carte)
+        # On stocke/met à jour systématiquement pour avoir la donnée la plus fraîche
+        # Même si le message n'est pas finalisé, on a déjà la première carte
         self.sequential_history[game_number] = {
             'carte': first_card_full, 
             'date': datetime.now().isoformat()
         }
+        
+        # On ne traite l'apprentissage (inter_data) que si on n'a pas déjà validé ce numéro
+        if game_number in self.collected_games:
+            return
+
         self.collected_games.add(game_number)
         
         n_minus_2 = game_number - 2
@@ -482,7 +483,7 @@ class CardPredictor:
 
     def analyze_and_set_smart_rules(self, chat_id: Optional[int] = None, initial_load: bool = False, force_activate: bool = False):
         """
-        Analyse les données pour trouver les Top 5 déclencheurs par ENSEIGNE DE RÉSULTAT.
+        Analyse les données pour trouver les Top 2 déclencheurs par ENSEIGNE DE RÉSULTAT.
         """
         self.last_inter_update_time = time.time() # Marquer la mise à jour
         # Toujours recharger les dernières données avant l'analyse
@@ -512,9 +513,7 @@ class CardPredictor:
             if not triggers_for_this_val:
                 continue
             
-            # Trier par fréquence et prendre jusqu'à 5 meilleurs
-            # On s'assure qu'ils sont uniques globalement dans les tops si possible
-            # Mais ici le user demande "pas de top identiques"
+            # Trier par fréquence et prendre jusqu'à 2 meilleurs (TOP 2)
             top_triggers = sorted(
                 triggers_for_this_val.items(), 
                 key=lambda x: x[1], 
@@ -523,7 +522,7 @@ class CardPredictor:
             
             count_added = 0
             for trigger_card, count in top_triggers:
-                if count_added >= 5:
+                if count_added >= 2: # CHANGÉ : TOP 2 au lieu de TOP 5
                     break
                 if trigger_card in seen_triggers:
                     continue
@@ -543,12 +542,12 @@ class CardPredictor:
         self.last_analysis_time = time.time()
         self._save_all_data()
 
-        logger.info(f"🧠 Analyse terminée. Règles trouvées: {len(self.smart_rules)}. Mode actif: {self.is_inter_mode_active}")
+        logger.info(f"🧠 Analyse terminée (Top 2). Règles trouvées: {len(self.smart_rules)}. Mode actif: {self.is_inter_mode_active}")
         
         # Notification si demandée
         if chat_id is not None and self.telegram_message_sender:
             if self.smart_rules:
-                msg = f"✅ **Analyse terminée !**\n\n{len(self.smart_rules)} règles créées à partir de {len(self.inter_data)} jeux collectés.\n\n🧠 **Mode INTER activé automatiquement**"
+                msg = f"✅ **Analyse terminée (Top 2) !**\n\n{len(self.smart_rules)} règles créées à partir de {len(self.inter_data)} jeux collectés.\n\n🧠 **Mode INTER activé automatiquement**"
             else:
                 msg = f"⚠️ **Pas assez de données**\n\n{len(self.inter_data)} jeux collectés. Continuez à jouer pour créer des règles."
             self.telegram_message_sender(chat_id, msg)
@@ -678,6 +677,12 @@ class CardPredictor:
             logger.debug("❌ Aucun numéro de jeu trouvé")
             return False, None, None, None
 
+        # 🔍 Vérifier les DEUX premières cartes du 1er groupe pour prédire
+        prediction_trigger_cards = self.get_first_two_cards_info(message)
+        if not prediction_trigger_cards:
+            logger.debug("❌ Aucune carte trouvée pour le déclenchement dans le 1er groupe")
+            return False, None, None, None
+
         # Le jeu qu'on va prédire est N + 2
         predicted_game_target = game_number + 2
 
@@ -701,12 +706,6 @@ class CardPredictor:
                 last_pred_suit = sorted_preds[0].get('predicted_costume')
                 last_predicted_value = SUIT_TO_VALUE_MAP.get(last_pred_suit, last_pred_suit)
 
-        # 🔍 Vérifier les DEUX premières cartes du 1er groupe pour prédire
-        prediction_trigger_cards = self.get_first_two_cards_info(message)
-        if not prediction_trigger_cards:
-            logger.debug("❌ Aucune carte trouvée pour le déclenchement dans le 1er groupe")
-            return False, None, None, None
-
         logger.info(f"🎮 Jeu source: {game_number} → Cartes déclencheur (2 premières): {prediction_trigger_cards}")
 
         predicted_suit = None
@@ -714,45 +713,22 @@ class CardPredictor:
         is_inter_prediction = False
         rule_index = 0
 
-        # ======= MODE INTER : PRIORITÉ ABSOLUE (TOP 5 UNIQUEMENT) =======
+        # ======= MODE INTER : PRIORITÉ ABSOLUE (TOP 2 UNIQUEMENT) =======
         if self.is_inter_mode_active and self.smart_rules:
             rules_by_value = defaultdict(list)
             for rule in self.smart_rules:
                 val = rule.get('predict', rule.get('result_suit'))
                 rules_by_value[val].append(rule)
             
-            if not self.smart_rules:
-                logger.debug("⏳ Mode INTER actif mais aucune règle générée. En attente de collecte.")
-                return False, None, None, None
-
             for val_target in ["A", "K", "Q", "J"]:
                 # ✅ RÈGLE : Pas deux valeurs identiques consécutives
                 if val_target == last_predicted_value:
-                    logger.debug(f"🚫 Valeur {val_target} identique à la précédente. Passage à la suivante.")
                     continue
 
-                val_rules = rules_by_value.get(val_target, [])[:5]
+                # On ne prend que le Top 2 (déjà filtré normalement, mais on assure ici)
+                val_rules = rules_by_value.get(val_target, [])[:2]
                 for idx, rule in enumerate(val_rules):
                     if rule['trigger'] in prediction_trigger_cards:
-                        key = f"{rule['trigger']}_{rule['predict']}"
-                        if key in self.quarantined_rules:
-                            qua_data = self.quarantined_rules[key]
-                            if isinstance(qua_data, dict) and time.time() < qua_data.get('expires_at', 0):
-                                continue
-                            elif not isinstance(qua_data, dict) and qua_data >= rule.get("count", 1):
-                                continue
-
-                        already_predicted = False
-                        target_game_internal = game_number + 2
-                        if target_game_internal in self.predictions:
-                            prev_pred = self.predictions[target_game_internal]
-                            if prev_pred.get('predicted_from') == game_number and \
-                               prev_pred.get('predicted_from_trigger') == rule['trigger'] and \
-                               prev_pred.get('status') == 'pending':
-                                already_predicted = True
-                        
-                        if already_predicted: continue
-
                         predicted_suit = rule['predict']
                         trigger_used = rule['trigger']
                         is_inter_prediction = True
@@ -762,7 +738,7 @@ class CardPredictor:
                 if predicted_suit: break
             
             if not predicted_suit:
-                logger.debug("⚠️ MODE INTER actif mais aucune règle TOP5 éligible (valeur différente attendue).")
+                logger.debug(f"⚠️ Aucun Top 2 ne match pour les cartes {prediction_trigger_cards}")
                 return False, None, None, None
         
         # ======= MODE STATIQUE : UTILISÉ UNIQUEMENT SI INTER INACTIF =======

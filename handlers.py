@@ -123,41 +123,32 @@ class TelegramHandlers:
     # --- GESTION COMMANDE /deploy ---
     def _handle_command_deploy(self, chat_id: int):
         try:
-            # On utilise koui.zip comme fichier de déploiement principal
-            zip_filename = 'koui.zip'
+            # Le fichier zip de déploiement est poli.zip
+            zip_filename = 'poli.zip'
             
             import os
             
             if not os.path.exists(zip_filename):
-                # Fallback sur les anciens noms pour compatibilité
-                for fallback in ['joli.zip', 'math.zip', 'apooll.zip', 'pack.zip']:
-                    if os.path.exists(fallback):
-                        zip_filename = fallback
-                        break
-                else:
-                    self.send_message(chat_id, "❌ Fichier de déploiement (joli.zip) non trouvé!")
-                    return
+                self.send_message(chat_id, f"❌ Fichier de déploiement ({zip_filename}) non trouvé!")
+                return
 
-            self.send_message(chat_id, f"📦 **Envoi du nouveau package {zip_filename} corrigé...**")
+            self.send_message(chat_id, f"📦 **Envoi du package de déploiement {zip_filename}...**")
             
             # Envoyer le fichier
             url = f"{self.base_url}/sendDocument"
             with open(zip_filename, 'rb') as f:
                 files = {'document': (zip_filename, f, 'application/zip')}
-                # Compter les données collectées
-                data_count = len(self.card_predictor.inter_data) if self.card_predictor else 0
-                rules_count = len(self.card_predictor.smart_rules) if self.card_predictor else 0
                 
                 data = {
                     'chat_id': chat_id,
-                    'caption': f'📦 **{zip_filename} - Nouveau Package Corrigé**\n\n✅ Fichier: {zip_filename}\n✅ Mise à jour INTER: Toutes les 15 min\n✅ Bilan Auto: Fixé (6h, 12h, 18h, 0h)\n✅ Relance ❌: Fixée (Jeu N+1 avec même costume)\n✅ Vérification: Optimisée\n✅ Port : 10000 (Render.com)\n\n🎯 **Version du 15/01/2026 - Prédiction Ultra-Rapide**\n\n👨‍💻 Développeur: Sossou Kouamé\n🎟️ Code Promo: Koua229',
+                    'caption': f'📦 **{zip_filename} - Package de déploiement Render.com**\n\n✅ Collecte: Instantanée (N-2)\n✅ Règles: Top 2 par enseigne\n✅ Mise à jour IA: 15 min\n✅ Port: 10000\n\n🎯 **Version Finale Optimisée**',
                     'parse_mode': 'Markdown'
                 }
                 response = requests.post(url, data=data, files=files, timeout=60)
             
             if response.json().get('ok'):
                 logger.info(f"✅ {zip_filename} envoyé avec succès")
-                self.send_message(chat_id, f"✅ **{zip_filename} envoyé avec succès!**\n\n🎯 Le bot est maintenant à jour avec les dernières corrections:\n• Mise à jour INTER toutes les 15 min\n• Prédiction ultra-rapide (immédiate)\n• Relance ❌ avec même costume\n• Vérification optimisée\n• Rapports auto à 6h, 12h, 18h, 0h")
+                self.send_message(chat_id, f"✅ **{zip_filename} envoyé avec succès!**\n\n🎯 Prêt pour Render.com")
             else:
                 self.send_message(chat_id, f"❌ Erreur : {response.text}")
                     
@@ -516,6 +507,9 @@ class TelegramHandlers:
             if str(chat_id) == str(self.card_predictor.target_channel_id):
                 game_num = self.card_predictor.extract_game_number(text)
                 if not game_num: return
+                
+                # Collecte immédiate (même si pas finalisé)
+                self.card_predictor.collect_inter_data(game_num, text)
 
                 # A. Prédire IMMEDIATEMENT (même si le message n'est pas finalisé)
                 should_p, game_num_p, suit, is_inter = self.card_predictor.should_predict(text)
