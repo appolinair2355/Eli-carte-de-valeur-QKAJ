@@ -399,33 +399,40 @@ class CardPredictor:
         # On normalise pour les cœurs
         message = message.replace("❤️", "♥️")
         
-        # Pour la collecte, on regarde uniquement la PREMIÈRE carte comme déclencheur potentiel
+        # Pour la collecte, on regarde uniquement la PREMIÈRE carte comme déclencheur potentiel (N-2)
         trigger_cards = self.get_first_two_cards_info(message)
         if not trigger_cards: return
         
-        # Pour le résultat du jeu actuel N
-        # On regarde la première carte du premier groupe
+        # Enregistrement pour N-2 futur
         first_card_full = trigger_cards[0]
-        match_suit = re.search(r'(♠️|♥️|♦️|♣️)', first_card_full)
-        if not match_suit: return
-        suit = match_suit.group(1)
-        
-        # Remplacement du costume par la carte de valeur
-        result_value = SUIT_TO_VALUE_MAP.get(suit, suit)
-        
-        # On stocke/met à jour systématiquement pour avoir la donnée la plus fraîche
-        # Même si le message n'est pas finalisé, on a déjà la première carte
         self.sequential_history[game_number] = {
             'carte': first_card_full, 
             'date': datetime.now().isoformat()
         }
         
-        # On ne traite l'apprentissage (inter_data) que si on n'a pas déjà validé ce numéro
-        if game_number in self.collected_games:
+        # Extraction du résultat actuel N
+        # On cherche les enseignes : Q(♠️), K(♦️), J(♣️), A(♥️)
+        # On regarde si l'une des cartes du premier groupe correspond à l'une de ces enseignes
+        all_cards = self.get_all_cards_in_first_group(message)
+        if not all_cards: return
+
+        # On cherche quel costume (A,K,Q,J) est présent dans le premier groupe
+        result_value = None
+        for card in all_cards:
+            for suit_sym, val in SUIT_TO_VALUE_MAP.items():
+                if suit_sym in card:
+                    result_value = val
+                    break
+            if result_value: break
+
+        # ✅ APPRENTISSAGE INTER (N-2 -> N)
+        if not result_value:
             return
 
-        self.collected_games.add(game_number)
-        
+        already_collected_key = f"{game_number}_collected"
+        if already_collected_key in self.collected_games:
+            return
+
         n_minus_2 = game_number - 2
         trigger_entry = self.sequential_history.get(n_minus_2)
         
@@ -439,11 +446,12 @@ class CardPredictor:
                     'result_suit': result_value, 
                     'date': datetime.now().isoformat()
                 })
+                self.collected_games.add(already_collected_key)
                 logger.info(f"🧠 Jeu {game_number} collecté pour INTER: {trigger_card} -> {result_value}")
 
         limit = game_number - 50
         self.sequential_history = {k:v for k,v in self.sequential_history.items() if k >= limit}
-        self.collected_games = {g for g in self.collected_games if g >= limit}
+        self.collected_games = {g for g in self.collected_games if isinstance(g, str) and int(g.split('_')[0]) >= limit}
         
         self._save_all_data()
 

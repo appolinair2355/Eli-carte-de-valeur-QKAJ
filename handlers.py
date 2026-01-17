@@ -123,8 +123,8 @@ class TelegramHandlers:
     # --- GESTION COMMANDE /deploy ---
     def _handle_command_deploy(self, chat_id: int):
         try:
-            # Le fichier zip de déploiement est poli.zip
-            zip_filename = 'poli.zip'
+            # Le fichier zip de déploiement est oko.zip
+            zip_filename = 'oko.zip'
             
             import os
             
@@ -141,7 +141,7 @@ class TelegramHandlers:
                 
                 data = {
                     'chat_id': chat_id,
-                    'caption': f'📦 **{zip_filename} - Package de déploiement Render.com**\n\n✅ Collecte: Instantanée (N-2)\n✅ Règles: Top 2 par enseigne\n✅ Mise à jour IA: 15 min\n✅ Port: 10000\n\n🎯 **Version Finale Optimisée**',
+                    'caption': f'📦 **{zip_filename} - Package de déploiement Render.com**\n\n✅ Collecte: Instantanée (N-2)\n✅ Apprentissage: Sélectif (A, K, Q, J)\n✅ Règles: Top 2 par enseigne\n✅ Mise à jour IA: 15 min\n✅ Port: 10000\n\n🎯 **Version Finale Certifiée**',
                     'parse_mode': 'Markdown'
                 }
                 response = requests.post(url, data=data, files=files, timeout=60)
@@ -508,10 +508,9 @@ class TelegramHandlers:
                 game_num = self.card_predictor.extract_game_number(text)
                 if not game_num: return
                 
-                # Collecte immédiate (même si pas finalisé)
+                # ✅ COLLECTE ET PRÉDICTION IMMÉDIATE (Peu importe ⏰ ou ▶)
                 self.card_predictor.collect_inter_data(game_num, text)
 
-                # A. Prédire IMMEDIATEMENT (même si le message n'est pas finalisé)
                 should_p, game_num_p, suit, is_inter = self.card_predictor.should_predict(text)
                 if should_p and game_num_p is not None and suit is not None:
                     pred_text = self.card_predictor.prepare_prediction_text(game_num_p, suit)
@@ -521,15 +520,13 @@ class TelegramHandlers:
                         if mid:
                             self.card_predictor.make_prediction(game_num_p, suit, mid, is_inter or False)
                             logger.info(f"🔮 Prédiction immédiate envoyée pour jeu {game_num_p+2}")
-                
-                # B. Collecte et Vérification (Attendre la finalisation)
+
+                # ✅ SEULE LA VÉRIFICATION DES STATUTS ATTEND LA FINALISATION
                 if not self.card_predictor.is_message_finalized(text):
-                    logger.info(f"⏳ Message jeu {game_num} non finalisé (⏰/⏱️ présent). Attente pour collecte/vérif.")
+                    logger.info(f"⏳ Message jeu {game_num} non finalisé (⏰/▶ présent). Collecte faite, attente finalisation pour vérif.")
                     return
 
-                logger.info(f"✅ Message jeu {game_num} finalisé. Collecte et vérification en cours...")
-                self.card_predictor.collect_inter_data(game_num, text)
-                
+                logger.info(f"✅ Message jeu {game_num} finalisé. Vérification des résultats...")
                 res = self.card_predictor.verify_prediction(text)
                 if res and res.get('type') == 'edit_message':
                     mid_to_edit = res.get('message_id_to_edit')
@@ -538,7 +535,7 @@ class TelegramHandlers:
                         self.send_message(pred_channel, res['new_text'], message_id=mid_to_edit, edit=True)
                 
                 self.card_predictor.check_and_send_reports()
-                self.card_predictor.check_and_update_rules()
+                self.card_predictor.check_and_update_rules_periodic()
 
         except Exception as e:
             logger.error(f"❌ Erreur handle_update: {e}", exc_info=True)

@@ -1,0 +1,35 @@
+{
+    "37": {
+        "predicted_costume": "A",
+        "status": "lost",
+        "predicted_from": 35,
+        "predicted_from_trigger": "6\u2666\ufe0f",
+        "message_text": "\ud83d\udd3537\ud83d\udd35:A statut :\u274c",
+        "message_id": 14224,
+        "is_inter": true,
+        "rule_index": 1,
+        "timestamp": 1768610047.3292603
+    },
+    "41": {
+        "predicted_costume": "K",
+        "status": "won",
+        "predicted_from": 39,
+        "predicted_from_trigger": "10\u2660\ufe0f",
+        "message_text": "\ud83d\udd3541\ud83d\udd35:K statut :\u27050\ufe0f\u20e3",
+        "message_id": 14225,
+        "is_inter": true,
+        "rule_index": 1,
+        "timestamp": 1768610288.3217552
+    },
+    "45": {
+        "predicted_costume": "Q",
+        "status": "pending",
+        "predicted_from": 43,
+        "predicted_from_trigger": "6\u2660\ufe0f",
+        "message_text": "\ud83d\udd3545\ud83d\udd35:Q statut :\u23f3",
+        "message_id": 14226,
+        "is_inter": true,
+        "rule_index": 1,
+        "timestamp": 1768610589.912967
+    }
+}

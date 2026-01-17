@@ -1,0 +1,38 @@
+[
+    {
+        "trigger": "6\u2660\ufe0f",
+        "predict": "Q",
+        "count": 2,
+        "result_suit": "Q"
+    },
+    {
+        "trigger": "6\u2663\ufe0f",
+        "predict": "Q",
+        "count": 1,
+        "result_suit": "Q"
+    },
+    {
+        "trigger": "10\u2660\ufe0f",
+        "predict": "K",
+        "count": 1,
+        "result_suit": "K"
+    },
+    {
+        "trigger": "8\u2660\ufe0f",
+        "predict": "K",
+        "count": 1,
+        "result_suit": "K"
+    },
+    {
+        "trigger": "9\u2663\ufe0f",
+        "predict": "J",
+        "count": 1,
+        "result_suit": "J"
+    },
+    {
+        "trigger": "6\u2666\ufe0f",
+        "predict": "A",
+        "count": 1,
+        "result_suit": "A"
+    }
+]
